@@ -1,7 +1,7 @@
 {
-  "name": "Stretching",
-  "short_name": "Stretching",
-  "description": "Stretching-Timer mit Gong",
+  "name": "Sport Timer",
+  "short_name": "Sport Timer",
+  "description": "Intervall-Timer mit Gong",
   "lang": "de",
   "start_url": "./",
   "scope": "./",

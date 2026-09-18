@@ -1,7 +1,8 @@
 /* Service Worker: macht die App offline nutzbar.
    Bei einer neuen Version die Nummer unten erhöhen (v1 -> v2),
    dann holen sich die Handys beim nächsten Start mit Internet das Update. */
-const CACHE = "stretching-v1";
+const PREFIX = "sport-timer-";
+const CACHE = PREFIX + "v1";
 const FILES = ["./", "index.html", "manifest.webmanifest",
                "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 
@@ -12,7 +13,7 @@ self.addEventListener("install", e => {
 self.addEventListener("activate", e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k.startsWith(PREFIX) && k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
