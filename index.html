@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Stretching</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#10262B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Stretching">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+  :root {
+    --ink: #10262B;        /* Grundfläche Einstellungen */
+    --ink-2: #1A373D;      /* Flächen auf Grund */
+    --brass: #C9A25A;      /* Gong / Akzent */
+    --paper: #F3EEE2;      /* Text */
+    --muted: #9DB2B3;
+    --stretch: #25624A;    /* Phase Stretching */
+    --rest: #2A4870;       /* Phase Pause */
+    --prep: #7C531F;       /* Phase Vorbereitung */
+    --done: #10262B;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
+  body {
+    background: var(--ink);
+    color: var(--paper);
+    font-family: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-variant-numeric: tabular-nums;
+    -webkit-user-select: none; user-select: none;
+    touch-action: manipulation;
+    transition: background-color .5s ease;
+  }
+  body[data-phase="work"] { background: var(--stretch); }
+  body[data-phase="rest"] { background: var(--rest); }
+  body[data-phase="prep"] { background: var(--prep); }
+
+  .view {
+    position: fixed; inset: 0;
+    display: none; flex-direction: column;
+    padding: calc(env(safe-area-inset-top) + 14px) 18px calc(env(safe-area-inset-bottom) + 16px);
+    gap: 10px;
+  }
+  .view.active { display: flex; }
+
+  button {
+    font: inherit; color: inherit; border: 0; border-radius: 22px;
+    cursor: pointer; touch-action: manipulation;
+  }
+  button:focus-visible { outline: 3px solid var(--paper); outline-offset: 3px; }
+  button:active { transform: scale(.97); }
+
+  /* ---------- Einstellungen ---------- */
+  h1 { margin: 0; font-size: 1.35rem; font-weight: 700; letter-spacing: .01em; }
+  .rows { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .row {
+    flex: 1; min-height: 0;
+    display: grid; grid-template-columns: minmax(64px, 22vw) 1fr minmax(64px, 22vw);
+    align-items: stretch; gap: 8px;
+  }
+  .row .step {
+    background: var(--ink-2); font-size: clamp(2rem, 9vw, 3rem); font-weight: 600; line-height: 1;
+    min-height: 70px;
+  }
+  .row .mid { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .row .val { font-size: clamp(2rem, 10vw, 3.2rem); font-weight: 700; line-height: 1.05; }
+  .row .lab { font-size: 1rem; color: var(--muted); }
+  .total { text-align: center; color: var(--muted); font-size: 1.05rem; min-height: 1.4em; }
+  .start {
+    background: var(--brass); color: #1B1408;
+    font-size: clamp(1.8rem, 8vw, 2.6rem); font-weight: 800;
+    min-height: clamp(90px, 17vh, 130px);
+  }
+
+  /* ---------- Training ---------- */
+  #run { align-items: stretch; text-align: center; }
+  .phase { font-size: clamp(1.6rem, 7vw, 2.4rem); font-weight: 700; margin-top: 4px; }
+  .disc-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  .disc { position: relative; height: 100%; max-height: 92vw; aspect-ratio: 1; max-width: 100%; }
+  .disc svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .disc .track { fill: none; stroke: rgba(255,255,255,.14); stroke-width: 5; }
+  .disc .arc { fill: none; stroke: var(--brass); stroke-width: 5; stroke-linecap: round; }
+  .disc .time {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: clamp(4rem, 27vw, 9rem); font-weight: 800; letter-spacing: -.02em;
+  }
+  .disc.strike { animation: strike .9s ease-out; }
+  @keyframes strike { 0% { transform: scale(1.05); } 100% { transform: scale(1); } }
+  @media (prefers-reduced-motion: reduce) { .disc.strike { animation: none; } body { transition: none; } }
+
+  .where { font-size: clamp(1.2rem, 5.5vw, 1.7rem); font-weight: 600; }
+  .bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,.16); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--paper); }
+  .hint { min-height: 1.2em; font-size: .9rem; color: rgba(255,255,255,.7); }
+
+  .big {
+    background: var(--paper); color: #14282C;
+    font-size: clamp(1.7rem, 7.5vw, 2.4rem); font-weight: 800;
+    min-height: clamp(84px, 15vh, 120px);
+  }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pair button {
+    background: rgba(0,0,0,.28); font-size: 1.25rem; font-weight: 700; min-height: 70px;
+  }
+  .pair button.warn { background: #B3412F; }
+
+  /* ---------- Fertig ---------- */
+  #done { justify-content: center; text-align: center; gap: 18px; }
+  #done .gong { width: 44vw; max-width: 220px; aspect-ratio: 1; margin: 0 auto; border-radius: 50%;
+    border: 6px solid var(--brass); display: flex; align-items: center; justify-content: center; }
+  #done .gong::after { content: ""; width: 26%; aspect-ratio: 1; border-radius: 50%; background: var(--brass); }
+  #done h2 { margin: 0; font-size: 2.4rem; }
+  #done p { margin: 0; color: var(--muted); font-size: 1.15rem; }
+</style>
+</head>
+<body data-phase="idle">
+
+<!-- Ansicht 1: Einstellungen -->
+<section id="setup" class="view active">
+  <h1>Stretching</h1>
+  <div class="rows" id="rows"></div>
+  <div class="total" id="total"></div>
+  <button class="start" id="btnStart">Start</button>
+</section>
+
+<!-- Ansicht 2: Training -->
+<section id="run" class="view">
+  <div class="phase" id="phase">Bereit machen</div>
+  <div class="disc-wrap">
+    <div class="disc" id="disc">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <circle class="track" cx="50" cy="50" r="46"></circle>
+        <circle class="arc" id="arc" cx="50" cy="50" r="46"></circle>
+      </svg>
+      <div class="time" id="time">0:05</div>
+    </div>
+  </div>
+  <div class="where" id="where"></div>
+  <div class="bar"><i id="barFill"></i></div>
+  <div class="hint" id="hint"></div>
+  <button class="big" id="btnPause">Pause</button>
+  <div class="pair">
+    <button id="btnSkip">Überspringen</button>
+    <button id="btnStop">Stopp</button>
+  </div>
+</section>
+
+<!-- Ansicht 3: Fertig -->
+<section id="done" class="view">
+  <div class="gong"></div>
+  <h2>Geschafft</h2>
+  <p id="doneText"></p>
+  <button class="start" id="btnBack">Zurück</button>
+</section>
+
+<script>
+"use strict";
+
+/* =========================================================
+   Einstellungen (werden im Handy gespeichert)
+   ========================================================= */
+const FIELDS = [
+  { key: "exercises", label: "Übungen",        min: 1,  max: 20,  step: 1, def: 3,  fmt: v => v },
+  { key: "work",      label: "Dauer je Übung", min: 10, max: 600, step: 5, def: 60, fmt: clock },
+  { key: "rest",      label: "Pause",          min: 0,  max: 120, step: 5, def: 15, fmt: clock },
+  { key: "series",    label: "Serien",         min: 1,  max: 10,  step: 1, def: 2,  fmt: v => v }
+];
+const PREP_SECONDS = 5;
+const STORE_KEY = "stretching.settings.v1";
+
+const cfg = {};
+FIELDS.forEach(f => cfg[f.key] = f.def);
+try {
+  const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "{}");
+  FIELDS.forEach(f => {
+    const v = Number(saved[f.key]);
+    if (Number.isFinite(v)) cfg[f.key] = Math.min(f.max, Math.max(f.min, v));
+  });
+} catch (e) { /* Speicher leer oder gesperrt: Standardwerte */ }
+
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(cfg)); } catch (e) {}
+}
+
+function clock(sec) {
+  sec = Math.max(0, Math.ceil(sec));
+  return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
+}
+
+const $ = id => document.getElementById(id);
+
+/* Zeilen mit großen Plus-/Minus-Tasten aufbauen */
+const valueEls = {};
+FIELDS.forEach(f => {
+  const row = document.createElement("div");
+  row.className = "row";
+  const minus = document.createElement("button");
+  minus.className = "step"; minus.textContent = "−"; minus.setAttribute("aria-label", f.label + " verringern");
+  const plus = document.createElement("button");
+  plus.className = "step"; plus.textContent = "+"; plus.setAttribute("aria-label", f.label + " erhöhen");
+  const mid = document.createElement("div");
+  mid.className = "mid";
+  const val = document.createElement("div"); val.className = "val";
+  const lab = document.createElement("div"); lab.className = "lab"; lab.textContent = f.label;
+  mid.append(val, lab);
+  row.append(minus, mid, plus);
+  $("rows").append(row);
+  valueEls[f.key] = val;
+  holdRepeat(minus, () => change(f, -f.step));
+  holdRepeat(plus,  () => change(f, +f.step));
+});
+
+function change(f, delta) {
+  cfg[f.key] = Math.min(f.max, Math.max(f.min, cfg[f.key] + delta));
+  save(); renderSetup();
+}
+
+/* Taste gedrückt halten = schnell weiterzählen */
+function holdRepeat(btn, fn) {
+  let t1, t2;
+  const stop = () => { clearTimeout(t1); clearInterval(t2); };
+  btn.addEventListener("pointerdown", e => {
+    e.preventDefault(); fn();
+    t1 = setTimeout(() => { t2 = setInterval(fn, 90); }, 450);
+  });
+  ["pointerup", "pointerleave", "pointercancel"].forEach(ev => btn.addEventListener(ev, stop));
+  btn.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fn(); } });
+}
+
+function totalSeconds() {
+  const n = cfg.exercises * cfg.series;
+  return n * cfg.work + (n - 1) * cfg.rest;
+}
+
+function renderSetup() {
+  FIELDS.forEach(f => valueEls[f.key].textContent = f.fmt(cfg[f.key]));
+  $("total").textContent = "Gesamtdauer " + clock(totalSeconds()) + " min";
+}
+renderSetup();
+
+/* =========================================================
+   Ton: Gong wird im Handy erzeugt (keine Audiodatei nötig)
+   ========================================================= */
+let ac = null;
+let silentEl = null;
+
+function audioInit() {
+  if (!ac) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) ac = new AC();
+  }
+  if (ac && ac.state !== "running") ac.resume().catch(() => {});
+
+  /* iOS: ein stilles Audio-Element sorgt dafür, dass der Gong auch bei
+     aktivem Stummschalter zu hören ist. */
+  if (!silentEl) {
+    silentEl = document.createElement("audio");
+    silentEl.src = silentWavUrl();
+    silentEl.loop = true;
+    silentEl.setAttribute("playsinline", "");
+  }
+  silentEl.play().catch(() => {});
+}
+
+function audioRelease() {
+  if (silentEl) silentEl.pause();
+}
+
+function silentWavUrl() {
+  const rate = 8000, n = rate; // 1 Sekunde Stille, 8 Bit mono
+  const buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, "RIFF"); v.setUint32(4, 36 + n, true); str(8, "WAVEfmt ");
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate, true);
+  v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+  str(36, "data"); v.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+  return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+}
+
+/* Gong: mehrere leicht verstimmte Obertöne mit langem Ausklang */
+function gong(base, when = 0, length = 4.5, volume = 0.9) {
+  if (!ac) return;
+  const t0 = ac.currentTime + when;
+  const out = ac.createGain();
+  out.gain.value = volume;
+  out.connect(ac.destination);
+  const partials = [
+    [1.00, 1.00, 1.00], [1.005, 0.60, 1.00],   // Grundton, leicht schwebend
+    [2.01, 0.55, 0.75], [2.76, 0.40, 0.55],
+    [3.92, 0.22, 0.40], [5.41, 0.12, 0.25]
+  ];
+  partials.forEach(([ratio, amp, life]) => {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = "sine";
+    o.frequency.value = base * ratio;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(amp * 0.3, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + length * life);
+    o.connect(g); g.connect(out);
+    o.start(t0); o.stop(t0 + length * life + 0.1);
+  });
+}
+const gongStart = () => gong(392);           // heller Gong: Übung beginnt
+const gongEnd   = () => gong(262);           // tiefer Gong: Übung endet
+const gongFinal = () => { gong(262, 0); gong(330, 1.1); gong(392, 2.2, 6); };
+
+function tick() {
+  if (!ac) return;
+  const t0 = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+  o.type = "sine"; o.frequency.value = 880;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.18, t0 + 0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.09);
+  o.connect(g); g.connect(ac.destination);
+  o.start(t0); o.stop(t0 + 0.12);
+}
+
+function buzz(pattern) {
+  if (navigator.vibrate) { try { navigator.vibrate(pattern); } catch (e) {} }
+}
+
+/* =========================================================
+   Bildschirm anlassen
+   ========================================================= */
+let wakeLock = null, wantAwake = false;
+
+async function stayAwake() {
+  wantAwake = true;
+  if (!("wakeLock" in navigator)) {
+    $("hint").textContent = "Dieses Gerät kann den Bildschirm nicht wach halten. Bitte die automatische Sperre verlängern.";
+    return;
+  }
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+    $("hint").textContent = "";
+    wakeLock.addEventListener("release", () => { wakeLock = null; });
+  } catch (e) {
+    $("hint").textContent = "Bildschirm-Wachhalten wurde vom System abgelehnt (z. B. Stromsparmodus).";
+  }
+}
+function allowSleep() {
+  wantAwake = false;
+  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && wantAwake) {
+    if (!wakeLock) stayAwake();
+    if (ac && ac.state !== "running") ac.resume().catch(() => {});
+    if (silentEl && running) silentEl.play().catch(() => {});
+  }
+});
+
+/* =========================================================
+   Ablauf
+   ========================================================= */
+let phases = [], idx = 0, phaseEndsAt = 0, remainingMs = 0;
+let running = false, paused = false, lastTickSec = null, loopId = null;
+const ARC_LEN = 2 * Math.PI * 46;
+$("arc").style.strokeDasharray = ARC_LEN;
+
+function buildPhases() {
+  const list = [{ type: "prep", sec: PREP_SECONDS }];
+  for (let s = 1; s <= cfg.series; s++) {
+    for (let e = 1; e <= cfg.exercises; e++) {
+      list.push({ type: "work", sec: cfg.work, s, e });
+      const last = s === cfg.series && e === cfg.exercises;
+      if (!last && cfg.rest > 0) list.push({ type: "rest", sec: cfg.rest, s, e });
+    }
+  }
+  return list;
+}
+
+function show(id) {
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === id));
+}
+
+function startTraining() {
+  audioInit();
+  stayAwake();
+  phases = buildPhases();
+  idx = 0; running = true; paused = false;
+  $("btnPause").textContent = "Pause";
+  resetStopButton();
+  show("run");
+  enterPhase(true);
+  clearInterval(loopId);
+  loopId = setInterval(loop, 100);
+}
+
+function enterPhase(silent) {
+  const p = phases[idx];
+  phaseEndsAt = performance.now() + p.sec * 1000;
+  lastTickSec = null;
+  document.body.dataset.phase = p.type;
+
+  if (p.type === "prep") {
+    $("phase").textContent = "Bereit machen";
+    $("where").textContent = "Gleich geht es los";
+  } else {
+    $("phase").textContent = p.type === "work" ? "Stretching" : "Pause";
+    const next = phases[idx + 1];
+    $("where").textContent = p.type === "work"
+      ? `Übung ${p.e} von ${cfg.exercises}, Serie ${p.s} von ${cfg.series}`
+      : `Als Nächstes: Übung ${next.e}, Serie ${next.s}`;
+  }
+  if (!silent && p.type === "work") { gongStart(); buzz(200); strike(); }
+  render();
+}
+
+function leavePhase() {
+  const p = phases[idx];
+  const isLast = idx === phases.length - 1;
+  if (isLast) { finish(); return; }
+  if (p.type === "work") {
+    const nextIsWork = phases[idx + 1].type === "work";
+    if (!nextIsWork) { gongEnd(); buzz([120, 80, 120]); strike(); }
+  }
+  idx++;
+  enterPhase(false);
+}
+
+function finish() {
+  running = false;
+  clearInterval(loopId);
+  gongFinal(); buzz([200, 100, 200, 100, 400]);
+  document.body.dataset.phase = "idle";
+  $("doneText").textContent =
+    `${cfg.exercises * cfg.series} Übungen in ${clock(totalSeconds())} min`;
+  show("done");
+  // Bildschirm und Ton erst freigeben, wenn der Schlussgong ausgeklungen ist
+  setTimeout(() => { if (!running) { allowSleep(); audioRelease(); } }, 9000);
+}
+
+function stopTraining() {
+  running = false; paused = false;
+  clearInterval(loopId);
+  allowSleep(); audioRelease();
+  document.body.dataset.phase = "idle";
+  show("setup");
+}
+
+function loop() {
+  if (!running || paused) return;
+  const left = phaseEndsAt - performance.now();
+  if (left <= 0) { leavePhase(); return; }
+  const sec = Math.ceil(left / 1000);
+  if (sec <= 3 && sec !== lastTickSec) { lastTickSec = sec; tick(); }
+  render();
+}
+
+function render() {
+  const p = phases[idx];
+  const left = paused ? remainingMs : Math.max(0, phaseEndsAt - performance.now());
+  $("time").textContent = clock(left / 1000);
+  const frac = Math.min(1, Math.max(0, left / (p.sec * 1000)));
+  $("arc").style.strokeDashoffset = ARC_LEN * (1 - frac);
+
+  // Gesamtfortschritt (ohne Vorbereitungszeit)
+  let done = 0, all = 0;
+  phases.forEach((q, i) => {
+    if (q.type === "prep") return;
+    all += q.sec;
+    if (i < idx) done += q.sec;
+    else if (i === idx) done += q.sec - left / 1000;
+  });
+  $("barFill").style.width = (all ? (done / all) * 100 : 0) + "%";
+}
+
+function strike() {
+  const d = $("disc");
+  d.classList.remove("strike"); void d.offsetWidth; d.classList.add("strike");
+}
+
+/* ---------- Tasten ---------- */
+$("btnStart").addEventListener("click", startTraining);
+
+$("btnPause").addEventListener("click", () => {
+  if (!running) return;
+  if (!paused) {
+    paused = true;
+    remainingMs = Math.max(0, phaseEndsAt - performance.now());
+    $("btnPause").textContent = "Weiter";
+  } else {
+    paused = false;
+    audioInit();
+    phaseEndsAt = performance.now() + remainingMs;
+    $("btnPause").textContent = "Pause";
+  }
+});
+
+$("btnSkip").addEventListener("click", () => {
+  if (!running) return;
+  if (paused) { paused = false; $("btnPause").textContent = "Pause"; }
+  leavePhase();
+});
+
+/* Stopp mit Sicherheitsabfrage: zweimal tippen */
+let stopArmed = null;
+function resetStopButton() {
+  clearTimeout(stopArmed); stopArmed = null;
+  $("btnStop").textContent = "Stopp";
+  $("btnStop").classList.remove("warn");
+}
+$("btnStop").addEventListener("click", () => {
+  if (stopArmed) { resetStopButton(); stopTraining(); return; }
+  $("btnStop").textContent = "Wirklich stoppen?";
+  $("btnStop").classList.add("warn");
+  stopArmed = setTimeout(resetStopButton, 3000);
+});
+
+$("btnBack").addEventListener("click", () => {
+  allowSleep(); audioRelease();
+  show("setup");
+});
+
+/* =========================================================
+   Offline-Betrieb
+   ========================================================= */
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
